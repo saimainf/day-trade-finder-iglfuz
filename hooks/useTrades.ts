@@ -1,34 +1,27 @@
 
 import { useState, useEffect } from 'react';
 import { Trade } from '@/types/Trade';
-import { mockTrades } from '@/data/mockTrades';
-import { stockPriceService } from '@/services/stockPriceService';
+import { realStockDataService } from '@/services/realStockDataService';
 
 export const useTrades = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadTrades = async () => {
-    console.log('Loading trades...');
+    console.log('Loading trades with real data...');
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setError(null);
       
-      // Get updated prices
-      const updatedTrades = await stockPriceService.updateTradesPrices(mockTrades);
+      // Generate trading recommendations based on real market data
+      const realTrades = await realStockDataService.generateTradingRecommendations();
       
-      // Sort by confidence score and timestamp
-      const sortedTrades = [...updatedTrades].sort((a, b) => {
-        if (b.confidenceScore !== a.confidenceScore) {
-          return b.confidenceScore - a.confidenceScore;
-        }
-        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-      });
-      
-      setTrades(sortedTrades);
+      console.log(`Loaded ${realTrades.length} trading recommendations`);
+      setTrades(realTrades);
     } catch (error) {
       console.error('Error loading trades:', error);
+      setError('Failed to load trading data. Please check your internet connection.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -36,8 +29,11 @@ export const useTrades = () => {
   };
 
   const refreshTrades = async () => {
-    console.log('Refreshing trades with latest prices...');
+    console.log('Refreshing trades with latest market data...');
     setRefreshing(true);
+    
+    // Clear cache to force fresh data
+    realStockDataService.clearCache();
     await loadTrades();
   };
 
@@ -51,19 +47,48 @@ export const useTrades = () => {
     );
   };
 
+  const updatePricesInBackground = async () => {
+    if (trades.length === 0) return;
+    
+    try {
+      console.log('Updating prices in background...');
+      const symbols = trades.map(trade => trade.symbol);
+      const quotes = await realStockDataService.getMultipleQuotes(symbols);
+      
+      setTrades(prevTrades =>
+        prevTrades.map(trade => {
+          const quote = quotes[trade.symbol];
+          if (quote) {
+            const newPotentialProfit = trade.targetSellPrice - quote.price;
+            const newPotentialProfitPercent = (newPotentialProfit / quote.price) * 100;
+            
+            return {
+              ...trade,
+              currentPrice: quote.price,
+              potentialProfit: newPotentialProfit,
+              potentialProfitPercent: newPotentialProfitPercent
+            };
+          }
+          return trade;
+        })
+      );
+    } catch (error) {
+      console.error('Error updating prices:', error);
+    }
+  };
+
   useEffect(() => {
     loadTrades();
     
-    // Set up periodic price updates every 30 seconds
+    // Set up periodic price updates every 2 minutes (to respect API limits)
     const interval = setInterval(() => {
-      if (!refreshing) {
-        refreshTrades();
+      if (!refreshing && !loading) {
+        updatePricesInBackground();
       }
-    }, 30000);
+    }, 120000); // 2 minutes
     
     return () => {
       clearInterval(interval);
-      stockPriceService.cleanup();
     };
   }, []);
 
@@ -71,6 +96,7 @@ export const useTrades = () => {
     trades,
     loading,
     refreshing,
+    error,
     refreshTrades,
     toggleWatchlist
   };
