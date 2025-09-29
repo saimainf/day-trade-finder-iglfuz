@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Trade } from '@/types/Trade';
 import { mockTrades } from '@/data/mockTrades';
+import { stockPriceService } from '@/services/stockPriceService';
 
 export const useTrades = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -14,8 +15,11 @@ export const useTrades = () => {
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Get updated prices
+      const updatedTrades = await stockPriceService.updateTradesPrices(mockTrades);
+      
       // Sort by confidence score and timestamp
-      const sortedTrades = [...mockTrades].sort((a, b) => {
+      const sortedTrades = [...updatedTrades].sort((a, b) => {
         if (b.confidenceScore !== a.confidenceScore) {
           return b.confidenceScore - a.confidenceScore;
         }
@@ -32,6 +36,7 @@ export const useTrades = () => {
   };
 
   const refreshTrades = async () => {
+    console.log('Refreshing trades with latest prices...');
     setRefreshing(true);
     await loadTrades();
   };
@@ -48,6 +53,18 @@ export const useTrades = () => {
 
   useEffect(() => {
     loadTrades();
+    
+    // Set up periodic price updates every 30 seconds
+    const interval = setInterval(() => {
+      if (!refreshing) {
+        refreshTrades();
+      }
+    }, 30000);
+    
+    return () => {
+      clearInterval(interval);
+      stockPriceService.cleanup();
+    };
   }, []);
 
   return {
