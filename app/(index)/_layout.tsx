@@ -1,54 +1,75 @@
-import React from "react";
-import { useNetworkState } from "expo-network";
-import { Redirect, router, Stack } from "expo-router";
-import { Alert } from "react-native";
-import { Button } from "@/components/button";
-import { WidgetProvider } from "@/contexts/WidgetContext";
 
-export const unstable_settings = {
-  initialRouteName: "index",
-};
+import { Tabs } from 'expo-router';
+import { IconSymbol } from '@/components/IconSymbol';
+import { colors } from '@/styles/commonStyles';
 
-export default function AppIndexLayout() {
-  const networkState = useNetworkState();
-
-  React.useEffect(() => {
-    if (
-      !networkState.isConnected &&
-      networkState.isInternetReachable === false
-    ) {
-      Alert.alert(
-        "🔌 You are offline",
-        "You can keep using the app! Your changes will be saved locally and synced when you are back online."
-      );
-    }
-  }, [networkState.isConnected, networkState.isInternetReachable]);
-
-//   if (!user) {
-//     return <Redirect href="/(auth)" />;
-//   }
-
+export default function TabLayout() {
   return (
-        <WidgetProvider>
-            <Stack
-              screenOptions={{
-                ...(process.env.EXPO_OS !== "ios"
-                  ? {}
-                  : {
-                      headerLargeTitle: true,
-                      headerTransparent: true,
-                      headerBlurEffect: "systemChromeMaterial",
-                      headerLargeTitleShadowVisible: false,
-                      headerShadowVisible: true,
-                      headerLargeStyle: {
-                        // NEW: Make the large title transparent to match the background.
-                        backgroundColor: "transparent",
-                      },
-                    }),
-              }}
-            >
-              {/* Modal Demo Screens - These are configured in their individual screen files */}
-            </Stack>
-        </WidgetProvider>
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#007AFF',
+        tabBarInactiveTintColor: colors.text,
+        tabBarStyle: {
+          backgroundColor: 'white',
+          borderTopWidth: 1,
+          borderTopColor: '#e1e5e9',
+          paddingTop: 8,
+          paddingBottom: 8,
+          height: 88,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+          marginTop: 4,
+        },
+        headerShown: false,
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Trades',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="chart.line.uptrend.xyaxis" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="portfolio"
+        options={{
+          title: 'Portfolio',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="chart.pie" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="trading"
+        options={{
+          title: 'Trading',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="plus.circle" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          title: 'Analytics',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="chart.bar" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: 'Orders',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol name="doc.text" color={color} size={size} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
