@@ -1,87 +1,92 @@
+
 import React from "react";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, View, Text } from "react-native";
-// Components
-import { IconCircle } from "@/components/IconCircle";
+import { FlatList, StyleSheet, View, Text, RefreshControl, Pressable } from "react-native";
+import { TradeCard } from "@/components/TradeCard";
 import { IconSymbol } from "@/components/IconSymbol";
-import { BodyScrollView } from "@/components/BodyScrollView";
-import { Button } from "@/components/button";
-// Constants & Hooks
-import { backgroundColors } from "@/constants/Colors";
+import { useTrades } from "@/hooks/useTrades";
+import { appleBlue, appleGreen } from "@/constants/Colors";
+import { Trade } from "@/types/Trade";
 
 const ICON_COLOR = "#007AFF";
 
 export default function HomeScreen() {
+  const { trades, loading, refreshing, refreshTrades, toggleWatchlist } = useTrades();
 
-  const modalDemos = [
-    {
-      title: "Standard Modal",
-      description: "Full screen modal presentation",
-      route: "/modal",
-      color: "#007AFF",
-    },
-    {
-      title: "Form Sheet",
-      description: "Bottom sheet with detents and grabber",
-      route: "/formsheet",
-      color: "#34C759",
-    },
-    {
-      title: "Transparent Modal",
-      description: "Overlay without obscuring background",
-      route: "/transparent-modal",
-      color: "#FF9500",
-    }
-  ];
+  const handleTradePress = (trade: Trade) => {
+    console.log('Opening trade details for:', trade.symbol);
+    router.push({
+      pathname: '/trade-details',
+      params: { tradeId: trade.id }
+    });
+  };
 
-  const renderModalDemo = ({ item }: { item: typeof modalDemos[0] }) => (
-    <View style={styles.demoCard}>
-      <View style={[styles.demoIcon, { backgroundColor: item.color }]}>
-        <IconSymbol name="square.grid.3x3" color="white" size={24} />
-      </View>
-      <View style={styles.demoContent}>
-        <Text style={styles.demoTitle}>{item.title}</Text>
-        <Text style={styles.demoDescription}>{item.description}</Text>
-      </View>
-      <Button
-        variant="outline"
-        size="sm"
-        onPress={() => router.push(item.route as any)}
-      >
-        Try It
-      </Button>
+  const renderTrade = ({ item }: { item: Trade }) => (
+    <TradeCard
+      trade={item}
+      onPress={() => handleTradePress(item)}
+      onToggleWatchlist={() => toggleWatchlist(item.id)}
+    />
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <IconSymbol name="chart.line.uptrend.xyaxis" color="#666" size={48} />
+      <Text style={styles.emptyTitle}>No Trades Available</Text>
+      <Text style={styles.emptySubtitle}>
+        Pull to refresh to check for new trading opportunities
+      </Text>
     </View>
   );
 
-  const renderEmptyList = () => (
-    <BodyScrollView contentContainerStyle={styles.emptyStateContainer}>
-      <IconCircle
-        emoji=""
-        backgroundColor={
-          backgroundColors[Math.floor(Math.random() * backgroundColors.length)]
-        }
-      />
-    </BodyScrollView>
+  const renderHeader = () => (
+    <View style={styles.headerSection}>
+      <Text style={styles.headerTitle}>Day Trade Opportunities</Text>
+      <Text style={styles.headerSubtitle}>
+        AI-powered research finds the best trades for maximum profit
+      </Text>
+      <View style={styles.statsContainer}>
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>{trades.length}</Text>
+          <Text style={styles.statLabel}>Active Trades</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={[styles.statValue, { color: appleGreen }]}>
+            {trades.filter(t => t.confidenceScore >= 8).length}
+          </Text>
+          <Text style={styles.statLabel}>High Confidence</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={[styles.statValue, { color: appleBlue }]}>
+            {trades.filter(t => t.isWatchlisted).length}
+          </Text>
+          <Text style={styles.statLabel}>Watchlisted</Text>
+        </View>
+      </View>
+    </View>
   );
 
   const renderHeaderRight = () => (
     <Pressable
-      onPress={() => {console.log("plus")}}
+      onPress={() => {
+        console.log("Opening watchlist");
+        router.push('/watchlist');
+      }}
       style={styles.headerButtonContainer}
     >
-      <IconSymbol name="plus" color={ICON_COLOR} />
+      <IconSymbol name="heart.fill" color={ICON_COLOR} />
     </Pressable>
   );
 
   const renderHeaderLeft = () => (
     <Pressable
-      onPress={() => {console.log("gear")}}
+      onPress={() => {
+        console.log("Opening settings");
+        router.push('/settings');
+      }}
       style={styles.headerButtonContainer}
     >
-      <IconSymbol
-        name="gear"
-        color={ICON_COLOR}
-      />
+      <IconSymbol name="gear" color={ICON_COLOR} />
     </Pressable>
   );
 
@@ -89,19 +94,27 @@ export default function HomeScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "Building the app...",
+          title: "TradeScout",
           headerRight: renderHeaderRight,
           headerLeft: renderHeaderLeft,
         }}
       />
       <View style={styles.container}>
         <FlatList
-          data={modalDemos}
-          renderItem={renderModalDemo}
-          keyExtractor={(item) => item.route}
-          contentContainerStyle={styles.listContainer}
-          contentInsetAdjustmentBehavior="automatic"
+          data={trades}
+          renderItem={renderTrade}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={!loading ? renderEmptyState : null}
+          contentContainerStyle={trades.length === 0 ? styles.emptyContainer : styles.listContainer}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshTrades}
+              tintColor={appleBlue}
+            />
+          }
         />
       </View>
     </>
@@ -111,17 +124,16 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   headerSection: {
     padding: 20,
     paddingBottom: 16,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
+    marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
@@ -130,52 +142,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     lineHeight: 22,
+    marginBottom: 20,
   },
-  listContainer: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  demoCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+  statsContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  stat: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
   },
-  demoIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  demoContent: {
-    flex: 1,
-  },
-  demoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
   },
-  demoDescription: {
-    fontSize: 14,
+  statLabel: {
+    fontSize: 12,
     color: '#666',
-    lineHeight: 18,
+    textAlign: 'center',
   },
-  emptyStateContainer: {
-    alignItems: "center",
-    gap: 8,
+  listContainer: {
+    paddingBottom: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
     paddingTop: 100,
   },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   headerButtonContainer: {
-    padding: 6, // Just enough padding around the 24px icon
+    padding: 6,
   },
 });
